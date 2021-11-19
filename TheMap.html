@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Webscraper</title>
+	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+	   integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+	   crossorigin=""/>
+	 <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+	   integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+	   crossorigin=""></script>
+    
+	   <script src="wohnungen.geojson" type="text/javascript"></script>
+	   <script src="destination.geojson" type="text/javascript"></script>
+
+
+    <style>
+		#miniCharte { height: 768px; width: 1580px; }
+	</style>
+</head>
+
+<body>
+	<h1>Chartä</h1>
+	<br>
+	<div id="miniCharte"></div>
+    <script>
+
+		const imgTile =  L.tileLayer('https://api.maptiler.com/maps/hybrid/{z}/{x}/{y}.jpg?key=:::APIKEY:::', {
+			attribution: '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>',
+		});	
+		const vectorTile =  L.tileLayer('https://api.maptiler.com/maps/outdoor/256/{z}/{x}/{y}.png?key=:::APIKEY:::', {
+			attribution: '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>',
+		});
+
+		function showOnEachFeature(feature, layer){
+				layer.bindPopup("<b>"+feature.properties.address+"</b>"
+				+"<br> Size: "+ feature.properties.size+" m²" 
+				+"<br> Rent: "+feature.properties.rent+" CHF"
+				+"<br> Rooms: "+feature.properties.nRooms
+				+"<br>"
+				+"<br> Dauer (ÖV): "+feature.properties.avgMinutes+" min."
+				+"<br> <a href=\""+feature.properties.url+"\", target='_blank'>more info on "+feature.properties.source+"<\a>");}
+		
+		function showOnTarget(feature, layer){
+				layer.bindPopup("<b>"+  feature.properties.title+"</b>"
+				+"<br>"+  feature.properties.address
+				+"<br>"
+				+"<br>"+  feature.properties.comment);}
+
+		function circleOnLayer (feature, latlng) {
+					return L.circleMarker(latlng, geojsonMarkerOptions)}
+
+		var geojsonMarkerOptions = {
+					radius: 8,
+					fillColor: "#ff7800",
+					color: "#000",
+					weight: 1,
+					opacity: 1,
+					fillOpacity: 0.85
+				};
+
+        var markers 			= L.geoJSON(dataset, {onEachFeature: showOnEachFeature});
+		var targetAddressMarker = L.geoJSON(targetAddress, {				 
+							pointToLayer: circleOnLayer,
+							onEachFeature: showOnTarget});
+
+		var map = L.map('miniCharte', {
+						center: [47.387220,8.539902],
+						zoom: 12,
+						layers: [vectorTile, imgTile]
+					});
+		var basemaps = {"Image": imgTile, "Vector": vectorTile}
+		var overlays = {"Apartments":markers, "Job":targetAddressMarker}
+		
+		L.control.layers(basemaps, overlays).addTo(map);
+		L.control.scale().addTo(map)
+		targetAddressMarker.addTo(map);
+		markers.addTo(map);
+
+	</script>
+</body>
+
+<script>
+
+	const map = L.map('myMap').setView([47.387220,8.539902],13);
+
+	L.tileLayer('https://api.maptiler.com/maps/hybrid/{z}/{x}/{y}.jpg?key=:::APIKEY:::', {
+		attribution: '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>',
+	}).addTo(map);	
+
+	var markers = L.geoJSON(dataset)
+	
+	markers.addTo(map)
+
+</script>
+</body>
