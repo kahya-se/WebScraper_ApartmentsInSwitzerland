@@ -8,6 +8,7 @@ Created on Sun Jun 13 12:30:35 2021
 """
 
 from selenium import webdriver
+import requests
 import urllib.parse
 
 import os, sys 
@@ -610,32 +611,13 @@ def getCommuteTimes(dataframe, targetLat, targetLon, startCommute=''):
     print("Retrieving commuting times")
     i = 0
     for idx,row in dataframe.iterrows():
-        getURL = None
-        op = None
-        driver = None
-        ############ LOOPING THROUGH EACH ENTRY IS EXTREMELY SLOW 
+        ############ LOOPING THROUGH EACH ENTRY IS rather SLOW 
         lat = str(row['lat'])
         lon = str(row['lon'])
         getURL = 'http://transport.opendata.ch/v1/connections?from='+lat+'+'+lon+'&to='+str(targetLat)+'+'+str(targetLon)+'&datetime='+startCommute 
-        op = webdriver.ChromeOptions() 
-        op.add_argument("--headless")
-        op.add_argument("--no-sandbox") 
-        op.add_argument("--disable-setuid-sandbox") 
-        op.add_argument("--remote-debugging-port=9222")  # this
-        op.add_argument("--disable-dev-shm-using") 
-        op.add_argument("--disable-extensions") 
-        op.add_argument("--disable-gpu") 
-        driver = webdriver.Chrome(options=op) 
-        driver.get(getURL)
-        html = driver.page_source
-        driver.close()
-        
-        x = '<html><head></head><body><pre style="word-wrap: break-word; white-space: pre-wrap;">' 
-        xx = len(x)
-        y = '</pre></body></html>'
-        htmlClean = html[xx:html.find(y)]
-        toJSON = json.loads(htmlClean)  
-    
+        req = requests.get(getURL)
+        toJSON = json.loads(req.text) 
+
         mins = []
         for connection in toJSON['connections']:
             h = connection['duration'][3:]
