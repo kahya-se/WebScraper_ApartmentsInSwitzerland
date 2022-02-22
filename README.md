@@ -1,4 +1,4 @@
-# WebScraper for finding an apartment (in Switzerland)
+# WebScraper for finding apartments (in Switzerland)
 
 Next to criterias such as price, number of rooms and size of the apartment, I was looking for an apartment in a 'favourable neighbourhood' and with a limited commute time to work.
 The following 'tool' successfully served me as a decision support during my apartment hunt.
