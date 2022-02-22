@@ -30,6 +30,6 @@ As shown below, the background map can be changed between imagery and vector dat
 ## Final note
 This WebScraper retrieves data from other sources and cannot claim correctness, completeness, accuracy or actuality of the data. 
 The use of this WebScraper does not make you the owner the data. 
-The content found in this repository is intended for non-commercial, educational use only.
-Beware, your IP will be banned from the comparis site, if used extensively. 
+The content found in this repository is intended for non-commercial, educational use only.<br>
+Beware, your IP will be banned from the comparis site, if used extensively. <br>
 Lastly, feedback on writing a cleaner code highly appreciated. 
