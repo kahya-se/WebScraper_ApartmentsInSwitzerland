@@ -34,9 +34,4 @@ This WebScraper retrieves data from other sources and cannot claim correctness, 
 The use of this WebScraper does not make you the owner the data. 
 The content found in this repository is intended for non-commercial, educational use only.
 Beware, your IP will be banned from the comparis site, if used extensively. 
-
-<br> 
-<br> 
-<br> 
-## Very final note
-Feedback is highly appreciated, since I have no formal training on computer science. 
+Lastly, feedback on writing a cleaner code highly appreciated. 
