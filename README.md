@@ -1,15 +1,13 @@
 # WebScraper for finding an apartment (in Switzerland)
-<br>
+
 Next to criterias such as price, number of rooms and size of the apartment, I was looking for an apartment in a 'favourable neighbourhood' and with a limited commute time to work.
 The following 'tool' successfully served me as a decision support during my apartment hunt.
-<br>    
-<br>
+<br><br>
 Since not many websites offered a service for the latter mentioned criteria, a little script has been set up scraping three commonly used websites for apartments. 
 A HTML document (with the sophistication one step further than hello_world.html) displays the scraped and geocoded data on a map using leaflet (https://leafletjs.com/) and 
 maptiler (https://www.maptiler.com/). To be able to use 
 the map, you require a maptiler API Key which has to be inserted to the HTML file by replacing '':::API-KEY:::''. 
-<br>    
-<br>
+<br><br>
 Feel free to add functions retrieving commuting time using a bicycle or to improve the retrieval of the commuting times using the SBB API. 
 Needless to say, I haven't paid attention to the ''user experience of ScrapedApartmentsMap.html''. Be my guest and help me to improve the user experience. 
 
