@@ -4,30 +4,37 @@
 Created on Sun Jun 13 12:30:35 2021
 Refactored on Sun Feb 20 17:30:00 2022
 
+Version: 22-02
+
 @author: kahya-se
 
 Note:
     - Names of classes and functions might have changed. 
 
-Changes:
+Changes (compared to the version of Nov 2021):
     - (Very) Verbose descriptions
-    - "Replacing headless selenium with requests", except for Comparis (see below)
+    - "Replacing headless selenium with requests", except for Comparis (...)
     - Multi-threading
     - Methods to run Nominatim locally
-    - Less messy code
+    - Less messy code; yet more __init__ functions - related to ducks (https://en.wikipedia.org/wiki/Duck_typing)
     - Some more auxiliary functions
 
+Add-ons which would be great:
+    - Initiating and closing a local Nominatim instance from the script
+    - More pages to scrape from
+    - More means to commute (e.g. bike)
+
 """
+__version__ = "22-02"
+
 
 import os, sys 
-
 from selenium import webdriver
 import urllib.parse
 import requests
 import re
 import concurrent.futures
 #import subprocess
-
 
 import numpy as np
 import pandas as pd
@@ -597,19 +604,20 @@ class Geocoding():
     
     
     NOMINATIM = 'localhost'
-    ADDRESSES = ['']
+    DATA = ['']
     CLEAN_ADDRESS_ENTRIES = {}
     MAX_WORKERS = 10
     
     def __init__(self):
         if self.MAX_WORKERS < 1:
             self.MAX_WORKERS = 1
-        if isinstance(self.ADDRESSES, str):
-            self.ADDRESSES = [self.ADDRESSES]
-        if isinstance(self.ADDRESSES, (pd.DataFrame or gpd.GeoDataFrame)):
-            if 'address' in self.ADDRESSES.columns:
-                self.ADDRESSES = self.ADDRESSES['address'].tolist()
-        self.ADDRESSES = list(set(self.ADDRESSES))
+        if isinstance(self.DATA, str):
+            self.DATA = [self.DATA]
+        if isinstance(self.DATA, (pd.DataFrame or gpd.GeoDataFrame)):
+            if 'address' in self.DATA.columns:
+                self.DATA = self.DATA['address'].tolist()
+        self.DATA = list(set(self.DATA))
+        
         assert isinstance(self.CLEAN_ADDRESS_ENTRIES, dict), "CLEAN_ADDRESS_ENTRIES must be a dictionary"
         
 
@@ -649,7 +657,7 @@ class Geocoding():
         if len(self.CLEAN_ADDRESS_ENTRIES) > 0:
             cleaningLookUp.update(self.CLEAN_ADDRESS_ENTRIES)
         
-        for addressRaw in self.ADDRESSES:
+        for addressRaw in self.DATA:
             addressRaw = correctUmlauts(addressRaw)
             
             adr = addressRaw.replace('pl.','platz').replace('str.','strasse').replace('str ','strasse ')
@@ -747,7 +755,7 @@ class Geocoding():
 #
 ##################################################################################
 
-class CommutingTimes():
+class CommutingTimes(Geocoding):
     """
     Class to handle the retrieval of commuting times. 
     Currently, it uses the SBB-API to retrieve the average time spent for commuting, by
@@ -777,7 +785,7 @@ class CommutingTimes():
             than one entry, the results are successively enumerated (mins_sbb_1, mins_sbb_2,...)
     """
     
-    DATAFRAME = pd.DataFrame(data=None)
+    DATA = pd.DataFrame(data=None)
     DESTINATION = [(47.3760832, 8.52690016762467)] ### as LatLon or str
     MAX_WORKERS = 10
     MEANS = 'public_transportation'
@@ -788,9 +796,28 @@ class CommutingTimes():
         if self.MAX_WORKERS < 1:
             self.MAX_WORKERS = 1
         
-        assert 'lat' in self.DATAFRAME.columns
-        assert 'lon' in self.DATAFRAME.columns
-        assert 'address' in self.DATAFRAME.columns
+        dataCond1 = isinstance(self.DATA, list)
+        dataCond2 = isinstance(self.DATA, pd.Series)
+        dataCond3 = isinstance(self.DATA, pd.DataFrame) 
+        if dataCond3 == True:
+            dataCond3a = 'address' in self.DATA.columns
+            dataCond3b = 'lat' in self.DATA.columns
+            dataCond3c = 'lon' in self.DATA.columns
+            if all([dataCond3a,dataCond3b,dataCond3c]) == True:
+                dataCond3 = True
+            else:
+                print("Enter DATA accordingly.")
+        
+        if any([dataCond1,dataCond2]):
+            #getGeocoding = self.Geocoding()
+            #getGeocoding.NOMINATIM = 'local'
+            self.DATA = list(set(self.DATA))
+            self.DATA = self.geocode()
+            
+        
+        assert 'lat' in self.DATA.columns
+        assert 'lon' in self.DATA.columns
+        assert 'address' in self.DATA.columns
         assert 'public' in self.MEANS.lower()
         
         if not isinstance(self.DESTINATION,list):
@@ -834,8 +861,8 @@ class CommutingTimes():
         for self.destNo in range(self.DESTINATION_LENGTH):
             if 'public' in self.MEANS.lower():
                 commute = self.__commute_byTrain()
-                self.DATAFRAME = self.DATAFRAME.merge(commute, on='address')
-        return self.DATAFRAME
+                self.DATA = self.DATA.merge(commute, on='address')
+        return self.DATA
         
     
     def test(self):
@@ -886,7 +913,7 @@ class CommutingTimes():
         
         sbbResults = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.MAX_WORKERS) as executor:
-            for i,row in self.DATAFRAME.iterrows():
+            for i,row in self.DATA.iterrows():
                 sbb = executor.submit(__commuteTimes, row)
                 sbbResults.append(sbb)
         
@@ -1015,7 +1042,8 @@ def createNominatimParams(address):
     -------
         params (dict): 
     """
-    words = re.findall('[\u00C0-\u00FFA-Za-z\u00F0-\u02AF]+\s*[\u00C0-\u00FFA-Za-z\u00F0-\u02AF]+', address)
+    words = re.findall('[\u00C0-\u00FFA-Za-z\u00F0-\u02AF]+\-*\s*[\u00C0-\u00FFA-Za-z\u00F0-\u02AF]+', address)
+    
     street = words[0]
     city = words[-1]
     numbers = re.findall(r"\d[0-9]*", address)
@@ -1083,10 +1111,12 @@ def haversine(latlon1,latlon2):
     Haversine formula to calculate great-circle distance between two points on a sphere.
     https://en.wikipedia.org/wiki/Haversine_formula
     
-    Raduius of the earth in meters (at latitude of 47.3 and 500 masl) retrieved from:
+    Raduius of the earth in meters (at latitude of 47.3 and 450 masl) retrieved from:
     https://rechneronline.de/earth-radius/
     
-    Input: tuples with lat/lon in decimla degrees
+    Note, this is a quick approximation sufficient for the task at hand.
+    
+    Input: tuples with lat/lon in decimal degrees
     Returns: Distance in meters
     
     """
@@ -1098,8 +1128,8 @@ def haversine(latlon1,latlon2):
     insideArcsin = np.sin(dlat/2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2
     d = 2 * np.arcsin(np.sqrt(insideArcsin)) 
     
-    radius =  6367132
-    distance = radius * d
+    radiusToGroundlevel =  6367082
+    distance = radiusToGroundlevel * d
     return distance
 
 
@@ -1158,8 +1188,3 @@ def postalcode2city(postalcode):
             city = lookupdict[plz]
             cities.append(city)
         return cities
-        
-    
-    
-        
-            
