@@ -54,7 +54,7 @@ from datetime import timedelta, date
 #
 ##################################################################################
 
-class Scraper():
+class Scraper:
     """
     Module for scraping websites (immoscout, homegate and comparis) for apartments for rent. 
     
@@ -117,7 +117,7 @@ class Scraper():
         
         self._ORIGINAL_PAGE_ENTRY = self.PAGE
             
-        self.URLS = self.__getURL__()
+        self.URLS = self.__getURL()
         
         self.MAX_WORKERS = int(self.MAX_WORKERS)
         self.results = pd.DataFrame({'url':[], 'address':[], 'nRooms':[], 'size':[], 'rent':[], 'currency':[], 
@@ -125,15 +125,15 @@ class Scraper():
         
     def scrape(self):
         if (self.PAGE == 'all') or ('homegate' in self.PAGE):
-            self.results =  self.results.append(self.__scrapeHomegate__())
+            self.results =  self.results.append(self.__scrapeHomegate())
             print('Homegate scraped.')
             
         if (self.PAGE == 'all') or ('immoscout' in self.PAGE):
-            self.results =  self.results.append(self.__scrapeImmoscout__()) 
+            self.results =  self.results.append(self.__scrapeImmoscout()) 
             print('Immoscout scraped.')
             
         if (self.PAGE == 'all') or ('comparis' in self.PAGE):
-            self.results =  self.results.append(self.__scrapeComparis__())
+            self.results =  self.results.append(self.__scrapeComparis())
             print('Comparis scraped.')
                 
         self.results = self.results.drop_duplicates(subset=["address","description","rent"], keep='last').reset_index()
@@ -151,7 +151,7 @@ class Scraper():
         return self.results       
   
     
-    def __getURL__(self):
+    def __getURL(self):
         
         self.URL = {}
         
@@ -238,7 +238,7 @@ class Scraper():
         
     
     
-    def __scrapeComparis__(self):
+    def __scrapeComparis(self):
         
         op = None
         driver = None
@@ -335,7 +335,7 @@ class Scraper():
         return trawledComparis.drop_duplicates(subset=["url"])
     
     
-    def __scrapeImmoscout__(self):
+    def __scrapeImmoscout(self):
 
         URL = self.URLS['immoscout']
         response = requests.get(URL)
@@ -438,7 +438,7 @@ class Scraper():
         return trawledImmoscout.drop_duplicates(subset=["url"])
     
     
-    def __scrapeHomegate__(self):
+    def __scrapeHomegate(self):
         
         URL = self.URLS['homegate']
         response = requests.get(URL)
@@ -575,7 +575,7 @@ class Scraper():
 #
 ##################################################################################
     
-class Geocoding():
+class Geocoding:
     """ 
     Module for geocoding. In a nutshell, it takes a list of addresses and finds the 
     latitude and longitude for the set of the list. Eventually returns a pd.DataFrame.
@@ -1188,3 +1188,5 @@ def postalcode2city(postalcode):
             city = lookupdict[plz]
             cities.append(city)
         return cities
+        
+           
