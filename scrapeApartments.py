@@ -136,6 +136,7 @@ class Scraper:
             self.results =  self.results.append(self.__scrapeComparis())
             print('Comparis scraped.')
                 
+        self.results = self.results.sort_values('url', ascending=False)   
         self.results = self.results.drop_duplicates(subset=["address","description","rent"], keep='last').reset_index()
         self.results = self.results.drop(labels=['index'],axis=1)   
         
