@@ -1,3 +1,7 @@
+# It was fun while it lasted -- the scraper is not operational anymore. 
+
+After an IP block on comparis.ch and a change of the representation of the page sources, the web scraper (as it is) is not operational anymore. 
+
 # WebScraper for finding apartments (in Switzerland)
 
 Next to criterias such as price, number of rooms and size of the apartment, I was looking for an apartment in a 'favourable neighbourhood' and with a limited commute time to work.
