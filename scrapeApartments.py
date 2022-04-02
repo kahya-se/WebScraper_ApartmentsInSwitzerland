@@ -87,7 +87,7 @@ class Scraper:
         MAX_WORKERS (int): Number of workers for multi-threading
         INCLUDE_COORDS (bool): to keep or drop the columns lat/lon (as =True has many NULL values, it is recommended
                                                                     to use Module 2 for geocoding)
-        VERSION (int(0)): Insert 0 (int) to use the old scraper (selenium, headless)
+        VERSION (str): Insert 'selenium' to use the old scraper (selenium, headless)
         
     Returns:
         pd.DataFrame with columns: url (to ad), address, nRooms, size, rent, currency, description (title of the ad)
@@ -108,7 +108,7 @@ class Scraper:
     FILTER_KEYWORDS = ["Befristet", "befristet"]
     MAX_WORKERS = 10
     INCLUDE_COORDS = False
-    VERSION = 0
+    VERSION = 'selenium'
     
     def __init__(self):
         
@@ -131,15 +131,15 @@ class Scraper:
         
     def scrape(self):
         if (self.PAGE == 'all') or ('homegate' in self.PAGE):
-            if self.VERSION == 0:
-                self.results =  self.results.append(self.__scrapeHomegate_V0())
+            if self.VERSION == 'selenium':
+                self.results =  self.results.append(self.__scrapeHomegate_selenium())
             else:
                 self.results =  self.results.append(self.__scrapeHomegate())
             print('Homegate scraped.')
             
         if (self.PAGE == 'all') or ('immoscout' in self.PAGE):
-            if self.VERSION == 0:
-                self.results =  self.results.append(self.__scrapeImmoscout_V0())
+            if self.VERSION == 'selenium':
+                self.results =  self.results.append(self.__scrapeImmoscout_selenium())
             else:
                 self.results =  self.results.append(self.__scrapeImmoscout()) 
             print('Immoscout scraped.')
@@ -444,8 +444,8 @@ class Scraper:
         return trawledImmoscout.drop_duplicates(subset=["url"])
 
 
-    def __scrapeImmoscout_V0(self):
-        # old, but works - again...
+    def __scrapeImmoscout_selenium(self):
+        # old, but works - again/still...
         URL = None
         op = None
         driver = None
@@ -667,8 +667,8 @@ class Scraper:
         return trawledHomegate.drop_duplicates(subset=["url"])
             
 
-    def __scrapeHomegate_V0(self):
-
+    def __scrapeHomegate_selenium(self):
+        # old, but works - again/still...
         URL = None
         op = None
         driver = None
