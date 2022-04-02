@@ -1,7 +1,3 @@
-# It was fun while it lasted -- the scraper is not operational anymore. 
-
-After an IP block on comparis.ch and a change of the representation of the page sources, the web scraper (as it is) is not operational anymore. 
-
 # WebScraper for finding apartments (in Switzerland)
 
 Next to criterias such as price, number of rooms and size of the apartment, I was looking for an apartment in a 'favourable neighbourhood' and with a limited commute time to work.
@@ -15,7 +11,7 @@ the map, you require a maptiler API Key which has to be inserted to the HTML fil
 Feel free to add functions retrieving commuting time using a bicycle or to improve the retrieval of the commuting times using the SBB API. 
 Needless to say, I haven't paid attention to the ''user experience of ScrapedApartmentsMap.html''. Be my guest and help me to improve the user experience. 
 
-## Notes on the improved version
+## Notes on the latest version
 Bullet point summary of the improvements:
 * Beware, names of classes and functions might have changed!
 * More verbose descriptions of classes and functions
@@ -23,6 +19,7 @@ Bullet point summary of the improvements:
 * Replacing 'headless selenium' with requests. Significant impact on query time.
 * Functions to run Nominatim locally. Significant impact on query time and useful for scale-up.
 * More object oriented implementation  
+* Re-implementation of the selenium-based scraper, since homegate and immoscout changes in the html source were found. Hence, set the parameter SCRAPING_METHOD in the scraper to 'selenium'. 
 <br>
 The new implementation might come handy for scraping data beyond the original motive of having a decision support tool. As for instance, to grasp the housing market in Switzerland or set up a newsletter with an alert, if there is a new apartment for rent in an area of interest...  
 
