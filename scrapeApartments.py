@@ -2,15 +2,18 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sun Jun 13 12:30:35 2021
-Refactored on Sun Feb 20 17:30:00 2022
+Refactored on Sun Mar 31 17:30:00 2022
 
-Version: 22-02
+Version: 22-03
 
 @author: kahya-se
 
 Note:
     - Names of classes and functions might have changed. 
-
+    
+Changes (compared to the version of Feb 2022):
+    - Adding parameter VERSION to the class Scraper. Acts as a switch to use selenium.
+    
 Changes (compared to the version of Nov 2021):
     - (Very) Verbose descriptions
     - "Replacing headless selenium with requests", except for Comparis (...)
@@ -18,6 +21,7 @@ Changes (compared to the version of Nov 2021):
     - Methods to run Nominatim locally
     - Less messy code; yet more __init__ functions - related to ducks (https://en.wikipedia.org/wiki/Duck_typing)
     - Some more auxiliary functions
+    
 
 Add-ons which would be great:
     - Initiating and closing a local Nominatim instance from the script
@@ -25,7 +29,7 @@ Add-ons which would be great:
     - More means to commute (e.g. bike)
 
 """
-__version__ = "22-02"
+__version__ = "22-03"
 
 
 import os, sys 
@@ -83,6 +87,7 @@ class Scraper:
         MAX_WORKERS (int): Number of workers for multi-threading
         INCLUDE_COORDS (bool): to keep or drop the columns lat/lon (as =True has many NULL values, it is recommended
                                                                     to use Module 2 for geocoding)
+        VERSION (int(0)): Insert 0 (int) to use the old scraper (selenium, headless)
         
     Returns:
         pd.DataFrame with columns: url (to ad), address, nRooms, size, rent, currency, description (title of the ad)
@@ -93,8 +98,8 @@ class Scraper:
     PAGE = 'homegate_immoscout'
     ROOMS_MIN = 1.5
     ROOMS_MAX = 1000
-    SIZE_MIN = 60
-    SIZE_MAX = 800
+    SIZE_MIN = 25
+    SIZE_MAX = 8000
     PRICE_MIN = 0
     PRICE_MAX = 1800
     IMAGES = True
@@ -103,6 +108,7 @@ class Scraper:
     FILTER_KEYWORDS = ["Befristet", "befristet"]
     MAX_WORKERS = 10
     INCLUDE_COORDS = False
+    VERSION = 0
     
     def __init__(self):
         
@@ -125,18 +131,24 @@ class Scraper:
         
     def scrape(self):
         if (self.PAGE == 'all') or ('homegate' in self.PAGE):
-            self.results =  self.results.append(self.__scrapeHomegate())
+            if self.VERSION == 0:
+                self.results =  self.results.append(self.__scrapeHomegate_V0())
+            else:
+                self.results =  self.results.append(self.__scrapeHomegate())
             print('Homegate scraped.')
             
         if (self.PAGE == 'all') or ('immoscout' in self.PAGE):
-            self.results =  self.results.append(self.__scrapeImmoscout()) 
+            if self.VERSION == 0:
+                self.results =  self.results.append(self.__scrapeImmoscout_V0())
+            else:
+                self.results =  self.results.append(self.__scrapeImmoscout()) 
             print('Immoscout scraped.')
             
         if (self.PAGE == 'all') or ('comparis' in self.PAGE):
             self.results =  self.results.append(self.__scrapeComparis())
             print('Comparis scraped.')
                 
-        self.results = self.results.sort_values('url', ascending=False)   
+        self.results = self.results.sort_values('url', ascending=True)   
         self.results = self.results.drop_duplicates(subset=["address","description","rent"], keep='last').reset_index()
         self.results = self.results.drop(labels=['index'],axis=1)   
         
@@ -303,13 +315,6 @@ class Scraper:
                 
                 size = float(infoAsDict['EssentialInformation'][1].split(" ")[0])
                 sizes.append(size)
-                
-                #if len(infoAsDict['EssentialInformation']) == 3:
-                #    floor =  infoAsDict['EssentialInformation'][2]
-                #else:
-                #    floor = np.nan
-                #floors.append(floor)
-                
                 pdates.append(infoAsDict['Date'])
                 
                 description = infoAsDict['Title']
@@ -437,6 +442,128 @@ class Scraper:
         trawledImmoscout['source'] = 'immoscout'
 
         return trawledImmoscout.drop_duplicates(subset=["url"])
+
+
+    def __scrapeImmoscout_V0(self):
+        # old, but works - again...
+        URL = None
+        op = None
+        driver = None
+
+        URL = self.__getURL__()
+        urlprefix = "https://www."
+
+        op = webdriver.ChromeOptions()
+        op.add_argument("--headless")
+        op.add_argument("--no-sandbox") 
+        op.add_argument("--disable-setuid-sandbox") 
+        op.add_argument("--remote-debugging-port=9222")  # this
+        op.add_argument("--disable-dev-shm-using") 
+        op.add_argument("--disable-extensions") 
+        op.add_argument("--disable-gpu") 
+        op.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.3")
+        driver = webdriver.Chrome(options=op) 
+        driver.get(URL)
+        html = driver.page_source
+        driver.close()
+
+        urls = []
+        addresses = []
+        prices = []
+        rooms = []
+        sizes = []
+        descriptions = []
+        floors = []
+        pdates = []
+        currency = []
+        lon = []
+        lat = []
+
+        startStr =  '"listData":['
+        endStr = ',"searchTopListingResultCount":'
+
+        newURL = URL+ "&page=0"
+        urlprefix = "https://www."
+
+        maxPagesTagStart = "<section class=\"Pagination__PaginationSection" 
+        maxPagesTagEnd = "</section>"
+        paginationChunk = html[html.find(maxPagesTagStart):html.find(maxPagesTagEnd,html.find(maxPagesTagStart))]
+        paginationsImmo = re.findall("pn=([0-9]|[1-9][0-9])\&", paginationChunk)
+        if len(paginationChunk) == 0:
+            maxPagination = 1
+        else:
+            maxPagination = np.max([int(x) for x in paginationsImmo])
+
+        startChunk = '{"id":\d{7}'
+        endChunk = ',"userRelevantScore":'
+
+        print("Immoscout accessed, no. of pages: {}".format(maxPagination+1))
+        for page in range(maxPagination+1):
+
+            startInfos = html.find(startStr)+len(startStr)
+            htmlPart = html[startInfos+1:]
+            endInfos = htmlPart.find(endStr)
+            infoChunk = htmlPart[:endInfos]
+
+            y = [0]+[m.start(0)  for m in re.finditer(startChunk,infoChunk)]
+
+            for i,element in enumerate(y):
+
+                info = '{'+infoChunk[y[i]:infoChunk.find(endChunk, y[i])].replace(',{"id":','"id":')+'}'
+                info = info.replace('{{"id"','{"id"')
+
+                if info.startswith('{"id":'):
+
+                    infoAsDict = json.loads(info)
+                    urls.append('https://www.immoscout24.ch'+infoAsDict['propertyUrl'])
+
+                    if 'street' in infoAsDict:
+                        addresses.append( ", ".join([infoAsDict['street'], " ".join([infoAsDict['zip'],  infoAsDict['cityName']])]))
+                    else:
+                        addresses.append(" ".join([infoAsDict['zip'],  infoAsDict['cityName']]))
+
+                    if infoAsDict['priceFormatted'] == 'Preis auf Anfrage':
+                        prices.append(np.nan)
+                    elif 'grossPrice' in infoAsDict:
+                        prices.append( infoAsDict['grossPrice'] )
+                    else:
+                        prices.append( infoAsDict['price'])
+
+                    rooms.append( infoAsDict['numberOfRooms'] )
+                    sizes.append( infoAsDict['surfaceLiving'] )
+                    descriptions.append( infoAsDict['title'] )
+
+
+                    floors.append(np.nan)
+                    currency.append(infoAsDict['priceFormatted'][:3])
+
+                    pdate = infoAsDict['lastPublished']
+                    pdates.append(pdate)
+
+                    try:
+                        lon.append( infoAsDict['longitude'])
+                        lat.append( infoAsDict['latitude'])
+                    except KeyError:
+                        lon.append(np.nan)
+                        lat.append(np.nan)
+
+                else:
+                    continue
+
+            newURL = URL+"&pn="+str(page+2) #&pn=X
+            driver = webdriver.Chrome(options=op) 
+            driver.get(newURL)
+            html = driver.page_source
+            driver.close()
+
+        trawledImmoscout = pd.DataFrame({'url':urls, 'address':addresses, 'nRooms':rooms, 'size':sizes, 'rent':prices, 'currency':currency, 
+                                          'description':descriptions, 
+                                          'published':pdates, 'lat':lat, 'lon':lon})
+        trawledImmoscout['source'] = 'immoscout'
+
+        return trawledImmoscout.drop_duplicates(subset=["url"])
+    
+    
     
     
     def __scrapeHomegate(self):
@@ -540,6 +667,119 @@ class Scraper:
         return trawledHomegate.drop_duplicates(subset=["url"])
             
 
+    def __scrapeHomegate_V0(self):
+
+        URL = None
+        op = None
+        driver = None
+
+        URL = self.__getURL__()
+        urlprefix = "https://www."
+
+        op = webdriver.ChromeOptions()
+        op.add_argument("--headless")
+        op.add_argument("--no-sandbox") 
+        op.add_argument("--disable-setuid-sandbox") 
+        op.add_argument("--remote-debugging-port=9222")  # this
+        op.add_argument("--disable-dev-shm-using") 
+        op.add_argument("--disable-extensions") 
+        op.add_argument("--disable-gpu") 
+        op.add_argument("--headless")
+        op.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.3")
+        driver = webdriver.Chrome(options=op) 
+        driver.get(URL)
+        html = driver.page_source
+        driver.close()
+
+        maxPageSpan = re.search('"pageCount":\d{1,5}', html).span()
+        maxPageStr = html[maxPageSpan[0]:maxPageSpan[1]].split(':')[1]
+        maxPage = int(maxPageStr)
+
+        chunkStart = re.search('<script>window.__INITIAL_STATE__=', html).span()[1]
+        chunkEnd = re.search(',"page":\d{1,5},"pageCount":\d{1,5},"', html).span()[0]
+
+        htmlChunk = html[chunkStart:chunkEnd]
+
+        urls = []
+        addresses = []
+        prices = []
+        rooms = []
+        sizes = []
+        descriptions = []
+        floors = []
+        pdates = []
+        currency = []
+        lon = []
+        lat = []
+
+        print("Homegate accessed, no. of pages: {}".format(maxPage))
+        for page in range(maxPage):
+            chunkStart = re.search('<script>window.__INITIAL_STATE__=', html).span()[1]
+            chunkEnd = re.search(',"page":\d{1,5},"pageCount":\d{1,5},"', html).span()[0]
+
+            htmlChunk = html[chunkStart:chunkEnd]
+
+            matches = [m.start(0) for m in re.finditer('{"listingType":{"type":"', htmlChunk)]
+
+            for miniStart in matches:
+
+                miniEnd = htmlChunk.find('"currency":',miniStart)+len('"currency":')+5
+
+                miniChunk = htmlChunk[miniStart:miniEnd]+"}}}"
+
+                chunkDict = json.loads(miniChunk)
+
+                url = 'https://www.homegate.ch/mieten/'+chunkDict['listing']['id']
+
+                urls.append(url)
+                try: 
+                    if chunkDict['listing']['prices']['rent']['interval'] == 'WEEK':
+                        multiplier = 4
+                    else:
+                        multiplier = 1
+
+                except KeyError:
+                    multiplier = 1
+
+                if 'gross' not in chunkDict['listing']['prices']['rent']:
+                    chunkDict['listing']['prices']['rent']['gross'] = np.nan
+
+
+                rent = chunkDict['listing']['prices']['rent']['gross'] * multiplier
+                prices.append(rent)
+                currency.append(chunkDict['listing']['prices']['currency'])
+
+                if len(chunkDict['listing']['address']) == 3:
+                    plzAdr = " ".join([chunkDict['listing']['address']['postalCode'], chunkDict['listing']['address']['locality']])
+                    address = ", ".join([chunkDict['listing']['address']['street'], plzAdr])
+
+                elif len(chunkDict['listing']['address']) == 2:
+                    address = " ".join([chunkDict['listing']['address']['postalCode'], chunkDict['listing']['address']['locality']])
+
+                addresses.append(address.replace(',,',','))        
+
+                rooms.append(chunkDict['listing']['characteristics']['numberOfRooms'])
+                sizes.append(chunkDict['listing']['characteristics']['livingSpace'])
+                descriptions.append(chunkDict['listing']['localization']['de']['text']['title'])
+
+                floors.append(np.nan)
+                pdates.append(np.nan)
+                lon.append(np.nan)
+                lat.append(np.nan)
+
+            newURL = URL+"&ep="+str(page+2) 
+            driver = webdriver.Chrome(options=op) 
+            driver.get(newURL)
+            html = driver.page_source
+            driver.close()
+            
+            
+        trawledHomegate = pd.DataFrame({'url':urls, 'address':addresses, 'nRooms':rooms, 'size':sizes, 'rent':prices, 'currency':currency, 
+                                 'description':descriptions, 
+                                 'published':pdates, 'lat':lat, 'lon':lon})
+        trawledHomegate['source'] = 'homegate'
+        return trawledHomegate.drop_duplicates(subset=["url"])
+            
         
     def filterDescription(self, dataframe):
         """
@@ -607,7 +847,7 @@ class Geocoding:
     NOMINATIM = 'localhost'
     DATA = ['']
     CLEAN_ADDRESS_ENTRIES = {}
-    MAX_WORKERS = 10
+    MAX_WORKERS = 50
     
     def __init__(self):
         if self.MAX_WORKERS < 1:
@@ -650,6 +890,10 @@ class Geocoding:
                             'Niedendorfstrasse':'Niederdorfstrasse',
                             'Schafhauserstrasse':'Schaffhauserstrasse',
                             'Zeughaustrasse':'Zeughausstrasse',
+                            'Albulstr':'Albulastr',
+                            '':'',
+                            '':'',
+                            '':'',
                             ': ZH': '',
                             ' ZH': '',
                             ' Nr.': '',
@@ -1190,4 +1434,4 @@ def postalcode2city(postalcode):
             cities.append(city)
         return cities
         
-           
+            
