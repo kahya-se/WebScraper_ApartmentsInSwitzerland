@@ -108,7 +108,7 @@ class Scraper:
     FILTER_KEYWORDS = ["Befristet", "befristet"]
     MAX_WORKERS = 10
     INCLUDE_COORDS = False
-    VERSION = 'selenium'
+    SCRAPING_METHOD = 'selenium'
     
     def __init__(self):
         
@@ -131,14 +131,14 @@ class Scraper:
         
     def scrape(self):
         if (self.PAGE == 'all') or ('homegate' in self.PAGE):
-            if self.VERSION == 'selenium':
+            if self.SCRAPING_METHOD == 'selenium':
                 self.results =  self.results.append(self.__scrapeHomegate_selenium())
             else:
                 self.results =  self.results.append(self.__scrapeHomegate())
             print('Homegate scraped.')
             
         if (self.PAGE == 'all') or ('immoscout' in self.PAGE):
-            if self.VERSION == 'selenium':
+            if self.SCRAPING_METHOD == 'selenium':
                 self.results =  self.results.append(self.__scrapeImmoscout_selenium())
             else:
                 self.results =  self.results.append(self.__scrapeImmoscout()) 
