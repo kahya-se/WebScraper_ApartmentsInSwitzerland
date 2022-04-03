@@ -12,7 +12,7 @@ Note:
     - Names of classes and functions might have changed. 
     
 Changes (compared to the version of Feb 2022):
-    - Adding parameter VERSION to the class Scraper. Acts as a switch to use selenium.
+    - Adding parameter SCRAPING_METHOD to the class Scraper. Acts as a switch to use selenium (as in the version of Nov 21).
     
 Changes (compared to the version of Nov 2021):
     - (Very) Verbose descriptions
@@ -87,7 +87,7 @@ class Scraper:
         MAX_WORKERS (int): Number of workers for multi-threading
         INCLUDE_COORDS (bool): to keep or drop the columns lat/lon (as =True has many NULL values, it is recommended
                                                                     to use Module 2 for geocoding)
-        VERSION (str): Insert 'selenium' to use the old scraper (selenium, headless)
+        SCRAPING_METHOD (str): Insert 'selenium' to use the old scraper (selenium, headless)
         
     Returns:
         pd.DataFrame with columns: url (to ad), address, nRooms, size, rent, currency, description (title of the ad)
@@ -132,6 +132,7 @@ class Scraper:
     def scrape(self):
         if (self.PAGE == 'all') or ('homegate' in self.PAGE):
             if self.SCRAPING_METHOD == 'selenium':
+                print('selenium')
                 self.results =  self.results.append(self.__scrapeHomegate_selenium())
             else:
                 self.results =  self.results.append(self.__scrapeHomegate())
@@ -139,6 +140,7 @@ class Scraper:
             
         if (self.PAGE == 'all') or ('immoscout' in self.PAGE):
             if self.SCRAPING_METHOD == 'selenium':
+                print('selenium')
                 self.results =  self.results.append(self.__scrapeImmoscout_selenium())
             else:
                 self.results =  self.results.append(self.__scrapeImmoscout()) 
@@ -186,11 +188,10 @@ class Scraper:
             price = "pf=" + str(int(self.PRICE_MIN/100))+"h" + closePart + "pt="+ str(int(self.PRICE_MAX/100))+"h" + closePart
             rooms = "nrf=" + str(self.ROOMS_MIN) + closePart + "nrt=" + str(self.ROOMS_MAX) + closePart
             size = "slf=" + str(self.SIZE_MIN) + closePart + "slt=" + str(self.SIZE_MAX) + closePart
-            images = "mai="+str(self.IMAGES) + closePart
             
             searchRadius = "r=" + str(self.RADIUS) + closePart
             
-            _URL = baseURL + locationString + price + rooms + size + searchRadius + images + closeURL
+            _URL = baseURL + locationString + price + rooms + size + searchRadius  + closeURL
             
             self.URL['immoscout'] = _URL
         
@@ -359,16 +360,6 @@ class Scraper:
                 
         print("Immoscout accessed, no. of pages: {}".format(maxPagination))
         
-        urls = []
-        addresses = []
-        prices = []
-        rooms = []
-        sizes = []
-        descriptions = []
-        pdates = []
-        currency = []
-        lat = []
-        lon = []
         
         startStr = '\{"id":\d{7},"accountId"'
         endStr = '\<\/script>'
@@ -376,7 +367,19 @@ class Scraper:
         pages = list(range(maxPagination+1))
         
         def __scrapeImmoscout_pages(page):
-            newURL = URL+"&pn="+str(page+1) #&pn=X
+            
+            urls = []
+            addresses = []
+            prices = []
+            rooms = []
+            sizes = []
+            descriptions = []
+            pdates = []
+            currency = []
+            lat = []
+            lon = []
+            
+            newURL = URL+"&pn="+str(page) #&pn=X
             response = requests.get(newURL)
             html = response.content.decode('utf-8')
             startInfos = re.search(startStr,html).span(0)[0]
@@ -395,24 +398,38 @@ class Scraper:
                 if len(infoAsDict) <9:
                     continue
                 
-                urls.append('https://www.immoscout24.ch'+infoAsDict['propertyUrl'])
+                _url = 'https://www.immoscout24.ch'+infoAsDict['propertyUrl']
+                _url = _url.replace("https://www.immoscout24.chhttps://","https://www.")
+                urls.append(_url)
                 
                 if 'street' in infoAsDict:
                     addresses.append( ", ".join([infoAsDict['street'], " ".join([infoAsDict['zip'],  infoAsDict['cityName']])]))
                 else:
                     addresses.append(" ".join([infoAsDict['zip'],  infoAsDict['cityName']]))
-                
+
                 if infoAsDict['priceFormatted'] == 'Preis auf Anfrage':
                     prices.append(np.nan)
                 elif 'grossPrice' in infoAsDict:
                     prices.append( infoAsDict['grossPrice'] )
                 else:
                     prices.append( infoAsDict['price'])
-                    
-                rooms.append( infoAsDict['numberOfRooms'] )
-                sizes.append( infoAsDict['surfaceLiving'] )
-                descriptions.append( infoAsDict['title'] )
                 
+                # ugly, but necessary (?)
+                try:
+                    rooms.append(infoAsDict['numberOfRooms'])
+                except KeyError:
+                    rooms.append(np.nan)
+                    
+                try:
+                    sizes.append(infoAsDict['surfaceLiving'] )
+                except KeyError:
+                    sizes.append(np.nan)
+                    
+                try:
+                    descriptions.append(infoAsDict['title'])
+                except KeyError:
+                    descriptions.append('no description')
+                    
                 currency.append(infoAsDict['priceFormatted'][:3])
                 
                 pdate = infoAsDict['lastPublished']
@@ -429,16 +446,21 @@ class Scraper:
             response = requests.get(newURL)
             html = response.content.decode('utf-8')
             #print("Scraped immoscout24: page {}".format(page))
-        
-        
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.MAX_WORKERS) as executor:
-            for page in pages:
-                executor.submit(__scrapeImmoscout_pages, page)
             
-        
-        trawledImmoscout = pd.DataFrame({'url':urls, 'address':addresses, 'nRooms':rooms, 'size':sizes, 'rent':prices, 'currency':currency, 
+            newRow = pd.DataFrame({'url':urls, 'address':addresses, 'nRooms':rooms, 'size':sizes, 'rent':prices, 'currency':currency, 
                                           'description':descriptions, 
                                           'published':pdates, 'lat':lat, 'lon':lon})
+            return newRow
+            
+        rows = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.MAX_WORKERS) as executor:
+            for page in pages:
+                row = executor.submit(__scrapeImmoscout_pages, page)
+                rows.append(row)
+            
+            
+        submitted = [row.result() for row in rows]
+        trawledImmoscout = pd.concat(submitted)
         trawledImmoscout['source'] = 'immoscout'
 
         return trawledImmoscout.drop_duplicates(subset=["url"])
@@ -450,8 +472,7 @@ class Scraper:
         op = None
         driver = None
 
-        URL = self.__getURL__()
-        urlprefix = "https://www."
+        URL = self.URLS['immoscout']
 
         op = webdriver.ChromeOptions()
         op.add_argument("--headless")
@@ -483,7 +504,6 @@ class Scraper:
         endStr = ',"searchTopListingResultCount":'
 
         newURL = URL+ "&page=0"
-        urlprefix = "https://www."
 
         maxPagesTagStart = "<section class=\"Pagination__PaginationSection" 
         maxPagesTagEnd = "</section>"
@@ -498,15 +518,21 @@ class Scraper:
         endChunk = ',"userRelevantScore":'
 
         print("Immoscout accessed, no. of pages: {}".format(maxPagination+1))
+        
+        
         for page in range(maxPagination+1):
-
+            newURL = URL+"&pn="+str(page) #&pn=X
+            driver = webdriver.Chrome(options=op) 
+            driver.get(newURL)
+            html = driver.page_source
+            driver.close()
+            
             startInfos = html.find(startStr)+len(startStr)
             htmlPart = html[startInfos+1:]
             endInfos = htmlPart.find(endStr)
             infoChunk = htmlPart[:endInfos]
 
             y = [0]+[m.start(0)  for m in re.finditer(startChunk,infoChunk)]
-
             for i,element in enumerate(y):
 
                 info = '{'+infoChunk[y[i]:infoChunk.find(endChunk, y[i])].replace(',{"id":','"id":')+'}'
@@ -528,11 +554,23 @@ class Scraper:
                         prices.append( infoAsDict['grossPrice'] )
                     else:
                         prices.append( infoAsDict['price'])
-
-                    rooms.append( infoAsDict['numberOfRooms'] )
-                    sizes.append( infoAsDict['surfaceLiving'] )
-                    descriptions.append( infoAsDict['title'] )
-
+                    
+                    # ugly, but necessary (?)
+                    try:
+                        rooms.append(infoAsDict['numberOfRooms'])
+                    except KeyError:
+                        rooms.append(np.nan)
+                        
+                    try:
+                        sizes.append(infoAsDict['surfaceLiving'] )
+                    except KeyError:
+                        sizes.append(np.nan)
+                        
+                    try:
+                        descriptions.append(infoAsDict['title'])
+                    except KeyError:
+                        descriptions.append('no description')
+                        
 
                     floors.append(np.nan)
                     currency.append(infoAsDict['priceFormatted'][:3])
@@ -549,12 +587,7 @@ class Scraper:
 
                 else:
                     continue
-
-            newURL = URL+"&pn="+str(page+2) #&pn=X
-            driver = webdriver.Chrome(options=op) 
-            driver.get(newURL)
-            html = driver.page_source
-            driver.close()
+        
 
         trawledImmoscout = pd.DataFrame({'url':urls, 'address':addresses, 'nRooms':rooms, 'size':sizes, 'rent':prices, 'currency':currency, 
                                           'description':descriptions, 
@@ -597,20 +630,20 @@ class Scraper:
                 
         htmlChunks = " ".join([h.result() for h in htmlChunks])
         
-        urls = []
-        addresses = []
-        prices = []
-        rooms = []
-        sizes = []
-        descriptions = []
-        pdates = []
-        currency = []
-        lat = []
-        lon = []
     
-        matches = [m.start(0) for m in re.finditer('{"listingType":{"type":"', htmlChunks)]
+        matches = [m.start(0) for m in re.finditer('{"listingType":', htmlChunks)]
         
         def __harvest_HomegateChunks(miniStart):
+            urls = []
+            addresses = []
+            prices = []
+            rooms = []
+            sizes = []
+            descriptions = []
+            pdates = []
+            currency = []
+            lat = []
+            lon = []
         
             miniEnd = htmlChunks.find('"currency":',miniStart)+len('"currency":')+5
             miniChunk = htmlChunks[miniStart:miniEnd]+"}}}"
@@ -629,11 +662,14 @@ class Scraper:
                 #print('KeyError: check rent interval, assumed interval: monthly')
                 multiplier = 1
             
-            if 'gross' not in chunkDict['listing']['prices']['rent']:
-                chunkDict['listing']['prices']['rent']['gross'] = np.nan
-        
-            
-            rent = chunkDict['listing']['prices']['rent']['gross'] * multiplier
+                
+            try:
+                chunkDict['listing']['prices']['rent']['gross']
+                rent = chunkDict['listing']['prices']['rent']['gross'] * multiplier
+                
+            except KeyError:
+                rent = np.nan
+
             prices.append(rent)
             currency.append(chunkDict['listing']['prices']['currency'])
         
@@ -653,16 +689,26 @@ class Scraper:
             pdates.append(np.nan)
             lat.append(np.nan)
             lon.append(np.nan)
-        
             
+            newRow = pd.DataFrame({'url':urls, 'address':addresses, 'nRooms':rooms, 'size':sizes, 'rent':prices, 'currency':currency, 
+                                          'description':descriptions, 
+                                          'published':pdates, 'lat':lat, 'lon':lon})
+            return newRow
+            
+        
+           
+        
+        rows = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.MAX_WORKERS) as executor:
-            for miniStart in matches:
-                executor.submit(__harvest_HomegateChunks, miniStart)
-                
-
-        trawledHomegate = pd.DataFrame({'url':urls, 'address':addresses, 'nRooms':rooms, 'size':sizes, 'rent':prices, 'currency':currency, 
-                                 'description':descriptions, 
-                                 'published':pdates, 'lat':lat, 'lon':lon})
+            for match in matches:
+                row = executor.submit(__harvest_HomegateChunks, match)
+                print(row)
+                rows.append(row)
+            
+            
+        submitted = [row.result() for row in rows]
+        trawledHomegate = pd.concat(submitted)
+        
         trawledHomegate['source'] = 'homegate'
         return trawledHomegate.drop_duplicates(subset=["url"])
             
@@ -673,8 +719,7 @@ class Scraper:
         op = None
         driver = None
 
-        URL = self.__getURL__()
-        urlprefix = "https://www."
+        URL = self.URLS['homegate']
 
         op = webdriver.ChromeOptions()
         op.add_argument("--headless")
@@ -740,12 +785,15 @@ class Scraper:
 
                 except KeyError:
                     multiplier = 1
+                
+                try:
+                    chunkDict['listing']['prices']['rent']['gross']
+                    rent = chunkDict['listing']['prices']['rent']['gross'] * multiplier
+                    
+                except KeyError:
+                    rent =np.nan
 
-                if 'gross' not in chunkDict['listing']['prices']['rent']:
-                    chunkDict['listing']['prices']['rent']['gross'] = np.nan
 
-
-                rent = chunkDict['listing']['prices']['rent']['gross'] * multiplier
                 prices.append(rent)
                 currency.append(chunkDict['listing']['prices']['currency'])
 
@@ -1433,5 +1481,3 @@ def postalcode2city(postalcode):
             city = lookupdict[plz]
             cities.append(city)
         return cities
-        
-            
