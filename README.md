@@ -19,7 +19,7 @@ Bullet point summary of the improvements:
 * Replacing 'headless selenium' with requests. Significant impact on query time.
 * Functions to run Nominatim locally. Significant impact on query time and useful for scale-up.
 * More object oriented implementation  
-* Re-implementation of the selenium-based scraper, since homegate and immoscout changes in the html source were found. Hence, set the parameter SCRAPING_METHOD in the scraper to 'selenium'. 
+* Re-implementation of the selenium-based scraper (SCRAPING_METHOD = 'selenium'). Slow + w/ overhead, but in certain cases robust.
 <br>
 The new implementation might come handy for scraping data beyond the original motive of having a decision support tool. As for instance, to grasp the housing market in Switzerland or set up a newsletter with an alert, if there is a new apartment for rent in an area of interest...  
 
